@@ -165,7 +165,7 @@ More detail and specific examples can be found in the included HTML file.
 				processed = true;
 			
 				canvas = plot.getCanvas();
-				target = $(canvas).parent();
+				target = plot.getPlaceholder();
 				options = plot.getOptions();
 			
 				plot.setData(combine(plot.getData()));

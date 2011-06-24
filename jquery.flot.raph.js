@@ -190,6 +190,7 @@
         plot.getYAxes = function () { return yaxes; };
         plot.c2p = canvasToAxisCoords;
         plot.p2c = axisToCanvasCoords;
+        plot.findNearbyItem = findNearbyItem;
         plot.getOptions = function () { return options; };
         plot.highlight = highlight;
         plot.unhighlight = unhighlight;
@@ -762,6 +763,11 @@
             var s, m, t = axis.options.transform || identity,
                 it = axis.options.inverseTransform;
             
+            if (axis.options.mode === "log") {
+                t  = function (v) { return Math.log(v); }
+                it = function (v) { return Math.exp(v); }
+            }
+            
             // precompute how much the axis is scaling a point
             // in canvas space
             if (axis.direction == "x") {
@@ -1020,6 +1026,8 @@
                 max = +(opts.max != null ? opts.max : axis.datamax),
                 delta = max - min;
 
+            if (opts.mode === "log") min = axis.datamin; //ignore opts.min -- it might not be log-scale compatible
+
             if (delta == 0.0) {
                 // degenerate case
                 var widen = max == 0 ? 1 : 0.01;
@@ -1035,7 +1043,8 @@
                 // consider autoscaling
                 var margin = opts.autoscaleMargin;
                 if (margin != null) {
-                    if (opts.min == null) {
+                    if (opts.min == null && opts.mode !== "log") {
+                        // Don't subtract margin in log scale -- it might cross zero
                         min -= delta * margin;
                         // make sure we don't go below zero if all values
                         // are positive
@@ -1362,7 +1371,7 @@
         function snapRangeToTicks(axis, ticks) {
             if (axis.options.autoscaleMargin && ticks.length > 0) {
                 // snap to ticks
-                if (axis.options.min == null)
+                if (axis.options.min == null && axis.options.mode !== "log")
                     axis.min = Math.min(axis.min, ticks[0].v);
                 if (axis.options.max == null && ticks.length > 1)
                     axis.max = Math.max(axis.max, ticks[ticks.length - 1].v);
@@ -1378,9 +1387,17 @@
                 drawAxisLabels();
             }
 
-            for (var i = 0; i < series.length; ++i) {
-                executeHooks(hooks.drawSeries, [null, series[i]]);
-                drawSeries(series[i]);
+            // REALLY NASTY HACK - FIXME
+            if (options.series.stack) {
+                for (var i = series.length -1; i >= 0; --i) {
+                    executeHooks(hooks.drawSeries, [null, series[i]]);
+                    drawSeries(series[i]);
+                }
+            } else {
+                for (var i = 0; i < series.length; ++i) {
+                    executeHooks(hooks.drawSeries, [null, series[i]]);
+                    drawSeries(series[i]);
+                }
             }
 
             executeHooks(hooks.draw, [paper]);
@@ -1533,9 +1550,9 @@
                 var path = "";
                 for (i = 0; i < axis.ticks.length; ++i) {
                     var v = axis.ticks[i].v;
-                    
+
                     xoff = yoff = 0;
-                    
+
                     if (v < axis.min || v > axis.max
                         // skip those lying on the axes if we got a border
                         || (t == "full" && bw > 0
@@ -1545,14 +1562,14 @@
                     if (axis.direction == "x") {
                         x = axis.p2c(v);
                         yoff = t == "full" ? -plotHeight : t;
-                        
+
                         if (axis.position == "top")
                             yoff = -yoff;
                     }
                     else {
                         y = axis.p2c(v);
                         xoff = t == "full" ? -plotWidth : t;
-                        
+
                         if (axis.position == "left")
                             xoff = -xoff;
                     }
@@ -1567,7 +1584,7 @@
                     path += "M"+x+" "+y;
                     path += "L"+(x+xoff)+" "+(y+yoff);
                 }
-                
+
                 if (path) {
                     paper.path(path).attr({
                         "stroke-width": 1,
@@ -1576,7 +1593,7 @@
                     }).translate(plotOffset.left, plotOffset.top);
                 }
             }
-            
+
             // draw border
             if (bw) {
                 paper.rect(-bw/2, -bw/2, plotWidth + bw, plotHeight + bw).attr({
@@ -1643,20 +1660,31 @@
             if (series.points.show)
                 drawSeriesPoints(series);
         }
-        
+
         function drawSeriesLines(series) {
-            function plotLine(datapoints, xoffset, yoffset, axisx, axisy) {
+            function plotLine(datapoints, xoffset, yoffset, axisx, axisy, forecastdate) {
                 var points = datapoints.points,
                     ps = datapoints.pointsize,
                     prevx = null, prevy = null;
-                
+
                 var path = "";
+                var strokeDash = ""; // solid
                 for (var i = ps; i < points.length; i += ps) {
                     var x1 = points[i - ps], y1 = points[i - ps + 1],
                         x2 = points[i], y2 = points[i + 1];
                     
-                    if (x1 == null || x2 == null)
+                    if (x1 == null || x2 == null) {
+                        if (x2 == null && x1 != null && (i == ps || i >= ps * 2 && points[i - 2*ps] == null)) {
+                            path += "M"+(axisx.p2c(x1) + xoffset)+" "+ (axisy.p2c(y1) + yoffset) + "L" + (axisx.p2c(x1) + xoffset + 1) + " " + (axisy.p2c(y1) + yoffset + 1);
+                        }
                         continue;
+                    }
+                    
+                    if (forecastdate && x2 > forecastdate && x1 <= forecastdate) {
+                        currentSet.push(paper.path(path));
+                        path = "M" + axisx.p2c(x1) + " " + axisy.p2c(y1);
+                        strokeDash = "-";
+                    }
 
                     // clip with ymin
                     if (y1 <= y2 && y1 < axisy.min) {
@@ -1722,7 +1750,11 @@
                     prevy = y2;
                     path += "L"+(axisx.p2c(x2) + xoffset)+" "+(axisy.p2c(y2) + yoffset);
                 }
-                if (path) currentSet.push(paper.path(path));
+                if (path) {
+                    var p = paper.path(path);
+                    if (strokeDash) p.attr({"stroke-dasharray":strokeDash});
+                    currentSet.push(p);
+                }
             }
 
             function plotLineArea(datapoints, axisx, axisy) {
@@ -1766,8 +1798,16 @@
                         }
                     }
                     
-                    if (x1 == null || x2 == null)
+                    if (x1 == null || x2 == null) {
+                        // This deals with points of the form null-point-null or start-point-null
+                        if (x2 == null && x1 != null && (i == ps || i >= ps * 2 && points[i - 2*ps] == null)) {
+                            var tmppath = "M"+ axisx.p2c(x1)+" "+ axisy.p2c(0) + "L" + axisx.p2c(x1) + " " + axisy.p2c(y1);
+                            tmppath += "L" + (axisx.p2c(x1) + 1) + " " + axisy.p2c(y1);
+                            tmppath += "L" + (axisx.p2c(x1) + 1) + " " + axisy.p2c(0) + "Z";
+                            currentSet.push(paper.path(tmppath));
+                        }
                         continue;
+                    }
 
                     // clip x values
                     
@@ -1867,7 +1907,7 @@
                     }
                 }
 
-                currentSet.push(paper.path(path));
+                if (path) currentSet.push(paper.path(path));
             }
 
             var lw = series.lines.lineWidth,
@@ -1887,16 +1927,19 @@
             currentSet = paper.set();
             var fillStyle = getFillStyle(series.lines, series.color, 0, plotHeight);
             if (fillStyle) {
+                fillStyle = Raphael.getRGB(fillStyle);
                 plotLineArea(series.datapoints, series.xaxis, series.yaxis);
                 currentSet.attr({
-                    fill: fillStyle,
-                    stroke: null
+                    fill: fillStyle.hex,
+                    opacity: fillStyle.opacity,
+                    stroke: null,
+                    "stroke-opacity": 0
                 }).translate(plotOffset.left, plotOffset.top);
                 currentSet = paper.set();
             }
 
             if (lw > 0)
-                plotLine(series.datapoints, 0, 0, series.xaxis, series.yaxis);
+                plotLine(series.datapoints, 0, 0, series.xaxis, series.yaxis, series["forecast-date"]);
             currentSet.attr({
                 stroke:series.color,
                 "stroke-width":lw
@@ -2104,13 +2147,13 @@
             c.normalize();
             return c.toString();
         }
-        
+
         function insertLegend() {
             placeholder.find(".legend").remove();
 
             if (!options.legend.show)
                 return;
-            
+
             var fragments = [], rowStarted = false,
                 lf = options.legend.labelFormatter, s, label;
             for (var i = 0; i < series.length; ++i) {
@@ -2118,7 +2161,7 @@
                 label = s.label;
                 if (!label)
                     continue;
-                
+
                 if (i % options.legend.noColumns == 0) {
                     if (rowStarted)
                         fragments.push('</tr>');
@@ -2128,14 +2171,14 @@
 
                 if (lf)
                     label = lf(label, s);
-                
+
                 fragments.push(
                     '<td class="legendColorBox"><div style="border:1px solid ' + options.legend.labelBoxBorderColor + ';padding:1px"><div style="width:4px;height:0;border:5px solid ' + s.color + ';overflow:hidden"></div></div></td>' +
                     '<td class="legendLabel">' + label + '</td>');
             }
             if (rowStarted)
                 fragments.push('</tr>');
-            
+
             if (fragments.length == 0)
                 return;
 
@@ -2179,10 +2222,10 @@
 
 
         // interactive features
-        
+
         var highlights = [],
             redrawTimeout = null;
-        
+
         // returns the data item the mouse is over, or null if none is found
         function findNearbyItem(mouseX, mouseY, seriesFilter) {
             var maxDistance = options.grid.mouseActiveRadius,
@@ -2192,7 +2235,7 @@
             for (i = series.length - 1; i >= 0; --i) {
                 if (!seriesFilter(series[i]))
                     continue;
-                
+
                 var s = series[i],
                     axisx = s.xaxis,
                     axisy = s.yaxis,
@@ -2201,7 +2244,12 @@
                     mx = axisx.c2p(mouseX), // precompute some stuff to make the loop faster
                     my = axisy.c2p(mouseY),
                     maxx = maxDistance / axisx.scale,
-                    maxy = maxDistance / axisy.scale;
+                    // DJW - this didn't use to take account of non-linear axes.
+                    //       We want the box around the mouse pointer to be constant size in cartesian coords,
+                    //       but we need to express this in data coords for efficiency.
+                    //       This means that the size of the box will vary along non-linear axes.
+                    //       It doesn't have to be too accurate -- this is just for an initial cull of points.
+                    maxy = Math.abs(axisy.c2p(mouseY - maxDistance) - my);
 
                 // with inverse transforms, we can't use the maxx/maxy
                 // optimization, sadly
@@ -2215,7 +2263,7 @@
                         var x = points[j], y = points[j + 1];
                         if (x == null)
                             continue;
-                        
+
                         // For points and lines, the cursor must be within a
                         // certain distance to the data point
                         if (x - mx > maxx || x - mx < -maxx ||
@@ -2236,11 +2284,11 @@
                         }
                     }
                 }
-                    
+
                 if (s.bars.show && !item) { // no other point can be nearby
                     var barLeft = s.bars.align == "left" ? 0 : -s.bars.barWidth/2,
                         barRight = barLeft + s.bars.barWidth;
-                    
+
                     for (j = 0; j < points.length; j += ps) {
                         var x = points[j], y = points[j + 1], b = points[j + 2];
                         if (x == null)
@@ -2261,13 +2309,13 @@
                 i = item[0];
                 j = item[1];
                 ps = series[i].datapoints.pointsize;
-                
+
                 return { datapoint: series[i].datapoints.points.slice(j * ps, (j + 1) * ps),
                          dataIndex: j,
                          series: series[i],
                          seriesIndex: i };
             }
-            
+
             return null;
         }
 
@@ -2276,13 +2324,13 @@
                 triggerClickHoverEvent("plothover", e,
                                        function (s) { return s["hoverable"] != false; });
         }
-        
+
         function onMouseLeave(e) {
             if (options.grid.hoverable)
                 triggerClickHoverEvent("plothover", e,
                                        function (s) { return false; });
         }
-        
+
         function onClick(e) {
             triggerClickHoverEvent("plotclick", e,
                                    function (s) { return s["clickable"] != false; });
@@ -2317,11 +2365,11 @@
                           h.point[1] == item.datapoint[1]))
                         unhighlight(h.series, h.point);
                 }
-                
+
                 if (item)
                     highlight(item.series, item.datapoint, eventname);
             }
-            
+
             eventHolder.trigger(eventname, [ pos, item ]);
         }
 
@@ -2337,27 +2385,27 @@
 
         function drawOverlay() {
             redrawTimeout = null;
-            
+
             if (highlightedSet) highlightedSet.remove();
-            
+
             highlightedSet = paper.set();
-            
+
             // draw highlights
             var i, hi;
             for (i = 0; i < highlights.length; ++i) {
                 hi = highlights[i];
-            
+
                 if (hi.series.bars.show)
                     drawBarHighlight(hi.series, hi.point);
                 else
                     drawPointHighlight(hi.series, hi.point);
             }
-            
+
             highlightedSet.translate(plotOffset.left, plotOffset.top);
 
             executeHooks(hooks.drawOverlay, paper);
         }
-        
+
         function highlight(s, point, auto) {
             if (typeof s == "number")
                 s = series[s];
@@ -2376,13 +2424,13 @@
             else if (!auto)
                 highlights[i].auto = false;
         }
-            
+
         function unhighlight(s, point) {
             if (s == null && point == null) {
                 highlights = [];
                 triggerRedrawOverlay();
             }
-            
+
             if (typeof s == "number")
                 s = series[s];
 
@@ -2396,7 +2444,7 @@
                 triggerRedrawOverlay();
             }
         }
-        
+
         function indexOfHighlight(s, p) {
             for (var i = 0; i < highlights.length; ++i) {
                 var h = highlights[i];
@@ -2406,14 +2454,14 @@
             }
             return -1;
         }
-        
+
         function drawPointHighlight(series, point) {
             var x = point[0], y = point[1],
                 axisx = series.xaxis, axisy = series.yaxis;
-            
+
             if (x < axisx.min || x > axisx.max || y < axisy.min || y > axisy.max)
                 return;
-                
+
             var pointRadius = series.points.radius + series.points.lineWidth / 2;
             var strokeStyle = $.color.parse(series.color).scale('a', 0.5).toString();
             var radius = 1.5 * pointRadius,
@@ -2461,7 +2509,7 @@
             n = "" + n;
             return n.length == 1 ? "0" + n : n;
         };
-        
+
         var r = [];
         var escape = false, padNext = false;
         var hours = d.getUTCHours();
@@ -2478,7 +2526,7 @@
         }
         for (var i = 0; i < fmt.length; ++i) {
             var c = fmt.charAt(i);
-            
+
             if (escape) {
                 switch (c) {
                 case 'h': c = "" + hours; break;
@@ -2510,10 +2558,10 @@
         }
         return r.join("");
     };
-    
+
     // round to nearby lower multiple of base
     function floorInBase(n, base) {
         return base * Math.floor(n / base);
     }
-    
+
 })(jQuery);
