@@ -1030,23 +1030,26 @@
 
             if (delta == 0.0) {
                 // degenerate case
-                var widen = max == 0 ? 1 : 0.01;
+                var widen;
 
                 var datum = new Date(min);
-                var isYear = (datum.getMonth() == 0 & datum.getDate() == 1) == 1;
-                var isMonth = datum.getDate() == 1;
-                var isDay = (datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds()) == 0;
+                var is_first_month_of_year = datum.getMonth() == 0;
+                var is_first_day_of_month = datum.getDate() == 1;
+                var is_midnight = !(datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds());
                 // widen for x axis only
+                // numbers below chosen by experiment; we'd like to do exactly one timeunit in each case but in practise the x-labels overlap.
                 if (axis.direction == "x") {
-                    if (isDay) {
-                        widen = 235000000; // widen to show the day
+                    if (is_midnight && is_first_day_of_month && is_first_month_of_year) {
+                        widen = 365*24*60*60*1000; // widen to show the year
+                    } else if (is_midnight && is_first_day_of_month) {
+                        widen = 60*24*60*60*1000; // widen to show the month
+                    } else if (is_midnight) {
+                        widen = 3*24*60*60*1000;; // widen to show the day.
+                    } else {
+                        widen = 3*60*60*1000; // about 3 hours each way
                     }
-                    if (isMonth & !isDay) {
-                        widen = 5190000000; // widen to show the month
-                    }
-                    if (isYear & isMonth & isDay) {
-                        widen = 32335389000; // widen to show the year
-                    }
+                } else {
+                    widen = max == 0 ? 1 : 0.01;
                 }
 
                 if (opts.min == null)
