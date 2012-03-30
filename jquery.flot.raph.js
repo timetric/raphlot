@@ -1032,10 +1032,6 @@
                 // degenerate case
                 var widen = max == 0 ? 1 : 0.01;
 
-                if (min < 1000000000000 & axis.direction == "x") {
-                    // convert to milliseconds
-                    min = min*1000;
-                }
                 var datum = new Date(min);
                 var isYear = (datum.getMonth() == 0 & datum.getDate() == 1) == 1;
                 var isMonth = datum.getDate() == 1;
