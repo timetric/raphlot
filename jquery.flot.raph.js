@@ -1032,6 +1032,27 @@
                 // degenerate case
                 var widen = max == 0 ? 1 : 0.01;
 
+                if (min < 1000000000000 & axis.direction == "x") {
+                    // convert to milliseconds
+                    min = min*1000;
+                }
+                var datum = new Date(min);
+                var isYear = (datum.getMonth() == 0 & datum.getDate() == 1) == 1;
+                var isMonth = datum.getDate() == 1;
+                var isDay = (datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds()) == 0;
+                // widen for x axis only
+                if (axis.direction == "x") {
+                    if (isDay) {
+                        widen = 235000000; // widen to show the day
+                    }
+                    if (isMonth & !isDay) {
+                        widen = 5190000000; // widen to show the month
+                    }
+                    if (isYear & isMonth & isDay) {
+                        widen = 32335389000; // widen to show the year
+                    }
+                }
+
                 if (opts.min == null)
                     min -= widen;
                 // always widen max if we couldn't widen min to ensure we
