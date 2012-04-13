@@ -1032,13 +1032,19 @@
                 // degenerate case
                 var widen;
 
-                var datum = new Date(min);
-                var is_first_month_of_year = datum.getMonth() == 0;
-                var is_first_day_of_month = datum.getDate() == 1;
-                var is_midnight = !(datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds());
                 // widen for x axis only
                 // numbers below chosen by experiment; we'd like to do exactly one timeunit in each case but in practise the x-labels overlap.
                 if (axis.direction == "x") {
+                    var datum;
+                    if (axis.datamin == null && axis.datamax == null) {
+                        // for a graph with no data, initialize to the current year
+                        min = max = +new Date(new Date().getFullYear(), 0, 1);
+                    }
+                    datum = new Date(min);
+                    var is_first_month_of_year = datum.getMonth() == 0;
+                    var is_first_day_of_month = datum.getDate() == 1;
+                    var is_midnight = !(datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds());
+
                     if (is_midnight && is_first_day_of_month && is_first_month_of_year) {
                         widen = 365*24*60*60*1000; // widen to show the year
                     } else if (is_midnight && is_first_day_of_month) {
