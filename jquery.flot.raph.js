@@ -667,14 +667,14 @@
                 
                 if (s.bars.show) {
                     // make sure we got room for the bar on the dancing floor
-                    var delta = s.bars.align == "left" ? 0 : -s.bars.barWidth/2;
+                    var delta = s.bars.align == "left" ? 0 : -s.bars.barWidth;
                     if (s.bars.horizontal) {
                         ymin += delta;
-                        ymax += delta + s.bars.barWidth;
+                        ymax += delta + s.bars.barWidth*2;
                     }
                     else {
                         xmin += delta;
-                        xmax += delta + s.bars.barWidth;
+                        xmax += delta + s.bars.barWidth*2;
                     }
                 }
                 
