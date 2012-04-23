@@ -1575,7 +1575,8 @@
                 for (i = 0; i < axis.ticks.length; ++i) {
                     var v = axis.ticks[i].v;
 
-                    xoff = yoff = x_ticks_off = y_ticks_off = 0;
+                    xoff = yoff = 0;
+                    var x_ticks_off = y_ticks_off = 0;
 
                     if (v < axis.min || v > axis.max
                         // skip those lying on the axes if we got a border
