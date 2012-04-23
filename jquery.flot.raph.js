@@ -1559,25 +1559,23 @@
                         x = box.left - plotOffset.left + (axis.position == "left" ? box.width : 0);
                 }
                 
-                // draw tick bar
-                // if (!axis.innermost) {
-                    xoff = yoff = 0;
-                    if (axis.direction == "x")
-                        xoff = plotWidth;
-                    else
-                        yoff = plotHeight;
-                    paper.path("M"+x+" "+y+"L"+ (x+xoff) +" "+ (y+yoff)).attr({
-                        "stroke-width": 1,
-                        "stroke": axis.options.color ? axis.options.color : "#999"
-                    }).translate(plotOffset.left, plotOffset.top);
-                // }
+                xoff = yoff = 0;
+                if (axis.direction == "x")
+                    xoff = plotWidth;
+                else
+                    yoff = plotHeight;
+                paper.path("M"+x+" "+y+"L"+ (x+xoff) +" "+ (y+yoff)).attr({
+                    "stroke-width": 1,
+                    "stroke": axis.options.color ? axis.options.color : "#999"
+                }).translate(plotOffset.left, plotOffset.top);
 
                 // draw ticks
                 var path = "";
+                var ticks_path = "";
                 for (i = 0; i < axis.ticks.length; ++i) {
                     var v = axis.ticks[i].v;
 
-                    xoff = yoff = 0;
+                    xoff = yoff = x_ticks_off = y_ticks_off = 0;
 
                     if (v < axis.min || v > axis.max
                         // skip those lying on the axes if we got a border
@@ -1588,16 +1586,23 @@
                     if (axis.direction == "x") {
                         x = axis.p2c(v);
                         yoff = t == "full" ? -plotHeight : t;
+                        y_ticks_off = 7;
 
                         if (axis.position == "top")
                             yoff = -yoff;
+                            y_ticks_off = -y_ticks_off;
                     }
                     else {
                         y = axis.p2c(v);
                         xoff = t == "full" ? -plotWidth : t;
+                        x_ticks_off = 7;
 
                         if (axis.position == "left")
                             xoff = -xoff;
+
+                        // to support split scales
+                        if (axis.position == "right")
+                            x_ticks_off = -x_ticks_off;
                     }
 
                     if (true) {
@@ -1609,6 +1614,8 @@
 
                     path += "M"+x+" "+y;
                     path += "L"+(x+xoff)+" "+(y+yoff);
+                    ticks_path += "M"+x+" "+y;
+                    ticks_path += "L"+(x+x_ticks_off)+" "+(y+y_ticks_off);
                 }
 
                 if (path) {
@@ -1616,6 +1623,13 @@
                         "stroke-width": 1,
                         "stroke":axis.options.tickColor || axis.options.color,
                         "opacity":0.22
+                    }).translate(plotOffset.left, plotOffset.top);
+                }
+                if (ticks_path) {
+                    paper.path(ticks_path).attr({
+                        "stroke-width": 1,
+                        "stroke":'black',
+                        "opacity":1
                     }).translate(plotOffset.left, plotOffset.top);
                 }
             }
