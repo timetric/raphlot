@@ -1041,9 +1041,9 @@
                         min = max = +new Date(new Date().getFullYear(), 0, 1);
                     }
                     datum = new Date(min);
-                    var is_first_month_of_year = datum.getMonth() == 0;
-                    var is_first_day_of_month = datum.getDate() == 1;
-                    var is_midnight = !(datum.getHours() || datum.getMinutes() || datum.getSeconds() || datum.getMilliseconds());
+                    var is_first_month_of_year = datum.getUTCMonth() == 0;
+                    var is_first_day_of_month = datum.getUTCDate() == 1;
+                    var is_midnight = !(datum.getUTCHours() || datum.getUTCMinutes() || datum.getUTCSeconds() || datum.getUTCMilliseconds());
 
                     if (is_midnight && is_first_day_of_month && is_first_month_of_year) {
                         widen = 365*24*60*60*1000; // widen to show the year
