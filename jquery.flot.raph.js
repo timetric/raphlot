@@ -1606,8 +1606,8 @@
                         stroke_opacity = 1;
                     }
 
-                    // if the y-axis has negative values, then we have an x-axis offset at y=0
-                    if (v < 0) {
+                    // if the left y-axis has negative values, then we have an x-axis offset at y=0
+                    if (v < 0 && axis.position == "left") {
                         has_negative_y_values = true;
                         xaxis_y_offset = axis.p2c(0);
                     }
