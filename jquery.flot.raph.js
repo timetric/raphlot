@@ -1574,6 +1574,9 @@
                     "stroke": axis.options.color ? axis.options.color : "#999"
                 }).translate(plotOffset.left, plotOffset.top);
 
+                // calculate location of x-axis (either at 0 or axis.min if the minimum is greater than 0)
+                var xaxis_location = Math.max(0, axis.min);
+
                 // draw ticks
                 for (i = 0; i < axis.ticks.length; ++i) {
                     var v = axis.ticks[i].v;
@@ -1598,8 +1601,8 @@
                     if (axis.position == "right")
                         x_tick_size = -x_tick_size;
 
-                    // if the y-axis has a value at zero, then this will be the 'x-axis' of the graph
-                    if (v == 0) {
+                    // plot the 'x-axis' at the calulated location
+                    if (v == xaxis_location) {
                         stroke_opacity = 1;
                     }
 
