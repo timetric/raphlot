@@ -183,7 +183,6 @@
                 if (axis)
                     res[axis.direction + (axis.n != 1 ? axis.n : "") + "axis"] = axis;
             });
-            
             return res;
         };
         plot.getXAxes = function () { return xaxes; };
@@ -1552,6 +1551,15 @@
             var path = "";
             var ticks_path = "";
 
+            var visible_axis_count = 0;
+            $.each(yaxes, function (_, axis) {
+                if (axis.show) {
+                    visible_axis_count++;
+                }
+            });
+
+            var one_yaxis = visible_axis_count == 1;
+
             for (var j = 0; j < yaxes.length; ++j) {
                 var axis = yaxes[j], box = axis.box,
                     t = axis.tickLength, x, y, xoff, yoff;
@@ -1569,9 +1577,13 @@
                 var xoff = 0;
                 var yoff = plotHeight;
 
+                var stroke_color = axis.options.color ? axis.options.color : "#999";
+                if (one_yaxis) {
+                    stroke_color = "black";
+                }
                 paper.path("M" + x + " " + y + "L" + x + " " + (y + yoff)).attr({
                     "stroke-width": 1,
-                    "stroke": axis.options.color ? axis.options.color : "#999"
+                    "stroke": stroke_color
                 }).translate(plotOffset.left, plotOffset.top);
 
                 // calculate location of x-axis (either at 0 or axis.min if the minimum is greater than 0)
@@ -1619,15 +1631,23 @@
                     ticks_path = "M" + x + " "+ y;
                     ticks_path += "L"+ (x + x_tick_size) + " " + y;
 
-                    paper.path(path).attr({
-                        "stroke-width": 1,
-                        "stroke":axis.options.tickColor || axis.options.color,
-                        "opacity": stroke_opacity
-                    }).translate(plotOffset.left, plotOffset.top);
+                    if (one_yaxis) {
+                        paper.path(path).attr({
+                            "stroke-width": 1,
+                            "stroke": "black",
+                            "opacity": stroke_opacity
+                        }).translate(plotOffset.left, plotOffset.top);
+                    } else {
+                        paper.path(path).attr({
+                            "stroke-width": 1,
+                            "stroke":axis.options.tickColor || axis.options.color,
+                            "opacity": stroke_opacity
+                        }).translate(plotOffset.left, plotOffset.top);
+                    }
 
                     paper.path(ticks_path).attr({
                         "stroke-width": 1,
-                        "stroke":'black'
+                        "stroke":"black"
                     }).translate(plotOffset.left, plotOffset.top);
                 }
             }
@@ -1688,7 +1708,7 @@
 
                     paper.path(ticks_path).attr({
                         "stroke-width": 1,
-                        "stroke":'black'
+                        "stroke":"black"
                     }).translate(plotOffset.left, plotOffset.top);
                 }
             }
